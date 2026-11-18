@@ -10,10 +10,6 @@ import java.io.InputStreamReader
 import java.util.Locale
 import java.util.zip.ZipInputStream
 
-/**
- * Parser 100% offline & sangat ringan untuk DOCX, XLSX, PPTX, ODT, EPUB, MD, CSV, TXT, JSON, XML, HTML.
- * Menggunakan ZipInputStream + XmlPullParser bawaan Android agar ukuran APK tetap sangat kecil.
- */
 object UniversalParser {
 
     fun toEditorialHtml(context: Context, uri: Uri, extension: String, isDark: Boolean): String {
@@ -36,33 +32,28 @@ object UniversalParser {
         val fg = if (isDark) "#F4F4F0" else "#18181B"
         val border = if (isDark) "#2E2E2A" else "#E4E2DC"
 
-        return """
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <meta charset="utf-8"/>
-              <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-              <style>
-                body { font-family: -apple-system, sans-serif; background: $bg; color: $fg; line-height: 1.65; padding: 18px; margin: 0; font-size: 16px; }
-                h1, h2, h3 { line-height: 1.3; margin-top: 1.2em; }
-                p { margin: 0 0 12px 0; }
-                pre { white-space: pre-wrap; word-wrap: break-word; font-family: monospace; font-size: 13.5px; }
-                table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
-                th, td { border: 1px solid $border; padding: 8px 10px; text-align: left; }
-                .slide-card { border: 1px solid $border; border-radius: 10px; padding: 14px; margin-bottom: 14px; }
-              </style>
-            </head>
-            <body>$bodyHtml</body>
-            </html>
-        """.trimIndent()
+        return buildString {
+            append("<!DOCTYPE html><html><head><meta charset='utf-8'/>")
+            append("<meta name='viewport' content='width=device-width, initial-scale=1.0'/>")
+            append("<style>")
+            append("body{font-family:-apple-system,sans-serif;background:$bg;color:$fg;line-height:1.65;padding:18px;margin:0;font-size:16px;}")
+            append("h1,h2,h3{line-height:1.3;margin-top:1.2em;}")
+            append("p{margin:0 0 12px 0;}")
+            append("pre{white-space:pre-wrap;word-wrap:break-word;font-family:monospace;font-size:13.5px;}")
+            append("table{border-collapse:collapse;width:100%;margin:12px 0;font-size:14px;}")
+            append("th,td{border:1px solid $border;padding:8px 10px;text-align:left;}")
+            append(".slide-card{border:1px solid $border;border-radius:10px;padding:14px;margin-bottom:14px;}")
+            append("</style></head><body>")
+            append(bodyHtml)
+            append("</body></html>")
+        }
     }
 
     fun extractPlainText(context: Context, uri: Uri, extension: String): String {
         val html = toEditorialHtml(context, uri, extension, false)
-        return html.replace(Regex("<style[\\s\\S]*?</style>"), "")
-            .replace(Regex("<[^>]+>"), "\n")
-            .replace(Regex("\\n{3,}"), "\n\n")
-            .trim()
+        val noStyle = Regex("<style[^>]*>.*?</style>", RegexOption.DOT_MATCHES_ALL).replace(html, "")
+        val noTags = Regex("<[^>]+>").replace(noStyle, "\n")
+        return noTags.lines().map { it.trim() }.filter { it.isNotEmpty() }.joinToString("\n")
     }
 
     private fun readText(input: InputStream): String =
@@ -128,7 +119,7 @@ object UniversalParser {
             while (entry != null) {
                 val content = zip.readBytes().toString(Charsets.UTF_8)
                 if (entry.name == "xl/sharedStrings.xml") {
-                    Regex("<t[^>]*>(.*?)</t>").findAll(content).forEach {
+                    Regex("<t[^>]*>(.*?)</t>", RegexOption.DOT_MATCHES_ALL).findAll(content).forEach {
                         sharedStrings.add(it.groupValues[1])
                     }
                 } else if (entry.name.startsWith("xl/worksheets/sheet") && entry.name.endsWith(".xml")) {
@@ -138,14 +129,15 @@ object UniversalParser {
             }
         }
         val sb = StringBuilder()
+        val sharedAttr = "t=" + '"' + "s" + '"'
         sheets.toSortedMap().forEach { (name, xml) ->
             sb.append("<h3>").append(name.substringAfterLast('/')).append("</h3><table>")
-            Regex("<row[^>]*>(.*?)</row>").findAll(xml).forEach { rowMatch ->
+            Regex("<row[^>]*>(.*?)</row>", RegexOption.DOT_MATCHES_ALL).findAll(xml).forEach { rowMatch ->
                 sb.append("<tr>")
-                Regex("<c([^>]*)>.*?<v>(.*?)</v>.*?</c>").findAll(rowMatch.groupValues[1]).forEach { cell ->
+                Regex("<c([^>]*)>.*?<v>(.*?)</v>.*?</c>", RegexOption.DOT_MATCHES_ALL).findAll(rowMatch.groupValues[1]).forEach { cell ->
                     val attrs = cell.groupValues[1]
                     val raw = cell.groupValues[2]
-                    val value = if (attrs.contains("t=\"s\"")) {
+                    val value = if (attrs.contains(sharedAttr)) {
                         sharedStrings.getOrNull(raw.toIntOrNull() ?: -1) ?: raw
                     } else raw
                     sb.append("<td>").append(escapeHtml(value)).append("</td>")
@@ -171,7 +163,7 @@ object UniversalParser {
         val sb = StringBuilder()
         slides.toSortedMap().entries.forEachIndexed { idx, (_, xml) ->
             sb.append("<div class='slide-card'><strong>Slide ${idx + 1}</strong><br/>")
-            Regex("<a:t>(.*?)</a:t>").findAll(xml).forEach {
+            Regex("<a:t>(.*?)</a:t>", RegexOption.DOT_MATCHES_ALL).findAll(xml).forEach {
                 sb.append("<p>").append(escapeHtml(it.groupValues[1])).append("</p>")
             }
             sb.append("</div>")
@@ -186,7 +178,7 @@ object UniversalParser {
             while (entry != null) {
                 if (entry.name.endsWith(".html") || entry.name.endsWith(".xhtml")) {
                     val raw = zip.readBytes().toString(Charsets.UTF_8)
-                    val body = Regex("<body[^>]*>([\\s\\S]*?)</body>").find(raw)?.groupValues?.get(1) ?: raw
+                    val body = Regex("<body[^>]*>(.*?)</body>", RegexOption.DOT_MATCHES_ALL).find(raw)?.groupValues?.get(1) ?: raw
                     sb.append(body).append("<hr/>")
                 }
                 entry = zip.nextEntry
