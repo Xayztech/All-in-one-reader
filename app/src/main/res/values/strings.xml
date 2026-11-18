@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">All In One Reader</string>
+    <string name="nav_library">Pustaka</string>
+    <string name="nav_create">Buat</string>
+    <string name="nav_tools">Konverter</string>
+    <string name="search_hint">Cari dokumen, PDF, DOCX, media…</string>
+    <string name="open_file">Buka File</string>
+    <string name="empty_library">Belum ada file terpilih.
+Ketuk "Buka File" untuk membaca atau mengelola dokumen apa pun secara offline.</string>
+</resources>

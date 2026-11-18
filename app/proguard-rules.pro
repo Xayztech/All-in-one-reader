@@ -1,0 +1,3 @@
+-keepattributes *Annotation*
+-dontwarn java.awt.**
+-dontwarn javax.swing.**
