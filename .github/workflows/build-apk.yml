@@ -12,6 +12,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Fix duplicate .xml.xml extensions and suppress compileSdk warning
+        run: |
+          for f in app/src/main/res/drawable/*.xml.xml; do
+            [ -e "$f" ] && mv "$f" "${f%.xml}"
+          done
+          grep -q "android.suppressUnsupportedCompileSdk" gradle.properties || echo "android.suppressUnsupportedCompileSdk=35" >> gradle.properties
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
