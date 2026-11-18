@@ -1,7 +1,7 @@
 # All In One Reader (`xy.readerone.id`) — v0.0.1
 
 Aplikasi pembaca, editor, konverter, dan pengelola dokumen **100% offline, tanpa iklan, ringan, dan mulus** untuk Android **4.4 KitKat (API 19)** hingga Android terbaru (**API 35**).
-
+ 
 ## Fitur Utama
 - **Tanpa Internet & Tanpa Iklan:** Tidak menggunakan izin `INTERNET` sama sekali di `AndroidManifest.xml`.
 - **Universal Reader (Multi-Format):**
